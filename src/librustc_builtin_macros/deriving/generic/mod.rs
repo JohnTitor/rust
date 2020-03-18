@@ -472,6 +472,7 @@ impl<'a> TraitDef<'a> {
                         .filter(|a| {
                             [
                                 sym::allow,
+                                sym::expect,
                                 sym::warn,
                                 sym::deny,
                                 sym::forbid,

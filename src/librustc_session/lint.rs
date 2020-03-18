@@ -10,6 +10,7 @@ pub mod builtin;
 #[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug, Hash)]
 pub enum Level {
     Allow,
+    Expect, // RFC 2883
     Warn,
     Deny,
     Forbid,
@@ -22,6 +23,7 @@ impl Level {
     pub fn as_str(self) -> &'static str {
         match self {
             Level::Allow => "allow",
+            Level::Expect => "expect",
             Level::Warn => "warn",
             Level::Deny => "deny",
             Level::Forbid => "forbid",
@@ -32,6 +34,7 @@ impl Level {
     pub fn from_str(x: &str) -> Option<Level> {
         match x {
             "allow" => Some(Level::Allow),
+            "expect" => Some(Level::Expect),
             "warn" => Some(Level::Warn),
             "deny" => Some(Level::Deny),
             "forbid" => Some(Level::Forbid),
@@ -43,6 +46,7 @@ impl Level {
     pub fn from_symbol(x: Symbol) -> Option<Level> {
         match x {
             sym::allow => Some(Level::Allow),
+            sym::expect => Some(Level::Expect),
             sym::warn => Some(Level::Warn),
             sym::deny => Some(Level::Deny),
             sym::forbid => Some(Level::Forbid),

@@ -363,7 +363,15 @@ impl<'a> AstValidator<'a> {
             .iter()
             .flat_map(|i| i.attrs.as_ref())
             .filter(|attr| {
-                let arr = [sym::allow, sym::cfg, sym::cfg_attr, sym::deny, sym::forbid, sym::warn];
+                let arr = [
+                    sym::allow,
+                    sym::cfg,
+                    sym::cfg_attr,
+                    sym::deny,
+                    sym::expect,
+                    sym::forbid,
+                    sym::warn,
+                ];
                 !arr.contains(&attr.name_or_empty()) && rustc_attr::is_builtin_attr(attr)
             })
             .for_each(|attr| {

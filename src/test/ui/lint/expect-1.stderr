@@ -1,0 +1,8 @@
+error: expect must have reason
+  --> $DIR/expect-1.rs:3:10
+   |
+LL | #[expect(unused)]
+   |          ^^^^^^
+
+error: aborting due to previous error
+

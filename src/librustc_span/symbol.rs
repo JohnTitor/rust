@@ -304,6 +304,7 @@ symbols! {
         exhaustive_integer_patterns,
         exhaustive_patterns,
         existential_type,
+        expect,
         expected,
         export_name,
         expr,

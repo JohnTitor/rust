@@ -201,6 +201,7 @@ pub const BUILTIN_ATTRIBUTES: &[BuiltinAttribute] = &[
     ungated!(allow, Normal, template!(List: r#"lint1, lint2, ..., /*opt*/ reason = "...""#)),
     ungated!(forbid, Normal, template!(List: r#"lint1, lint2, ..., /*opt*/ reason = "...""#)),
     ungated!(deny, Normal, template!(List: r#"lint1, lint2, ..., /*opt*/ reason = "...""#)),
+    ungated!(expect, Normal, template!(List: r#"lint1, lint2, ..., /*opt*/ reason = "...""#)),
     ungated!(must_use, Whitelisted, template!(Word, NameValueStr: "reason")),
     // FIXME(#14407)
     ungated!(

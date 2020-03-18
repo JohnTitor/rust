@@ -306,6 +306,7 @@ impl LintStore {
                 "requested on the command line with `{} {}`",
                 match level {
                     Level::Allow => "-A",
+                    Level::Expect => "-E",
                     Level::Warn => "-W",
                     Level::Deny => "-D",
                     Level::Forbid => "-F",

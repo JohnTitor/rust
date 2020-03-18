@@ -146,8 +146,16 @@ fn inject_impl_of_structural_trait(
         item.attrs
             .iter()
             .filter(|a| {
-                [sym::allow, sym::warn, sym::deny, sym::forbid, sym::stable, sym::unstable]
-                    .contains(&a.name_or_empty())
+                [
+                    sym::allow,
+                    sym::expect,
+                    sym::warn,
+                    sym::deny,
+                    sym::forbid,
+                    sym::stable,
+                    sym::unstable,
+                ]
+                .contains(&a.name_or_empty())
             })
             .cloned(),
     );

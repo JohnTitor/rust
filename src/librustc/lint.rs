@@ -6,10 +6,11 @@ use rustc_data_structures::stable_hasher::{HashStable, StableHasher};
 use rustc_errors::{pluralize, Applicability, DiagnosticBuilder, DiagnosticId};
 use rustc_hir::HirId;
 pub use rustc_session::lint::{builtin, Level, Lint, LintId, LintPass};
+use rustc_session::parse::feature_err;
 use rustc_session::{DiagnosticMessageId, Session};
 use rustc_span::hygiene::MacroKind;
 use rustc_span::source_map::{DesugaringKind, ExpnKind, MultiSpan};
-use rustc_span::{Span, Symbol};
+use rustc_span::{sym, Span, Symbol};
 
 /// How a lint level was set.
 #[derive(Clone, Copy, PartialEq, Eq, HashStable)]
@@ -211,6 +212,25 @@ pub fn struct_lint_level<'s, 'd>(
             (Level::Allow, _) => {
                 return;
             }
+            (Level::Expect, _) => {
+                if let LintSource::Node(_, src, None) = src {
+                    if !sess.features_untracked().lint_reasons {
+                        feature_err(
+                            &sess.parse_sess,
+                            sym::lint_reasons,
+                            src,
+                            "`expect` lint level is experimental",
+                        )
+                        .emit();
+                        return;
+                    }
+                    sess.struct_span_err(MultiSpan::from_span(src), "expect must have reason")
+                        .emit();
+                    return;
+                } else {
+                    return;
+                }
+            }
             (Level::Warn, Some(span)) => sess.struct_span_warn(span, ""),
             (Level::Warn, None) => sess.struct_warn(""),
             (Level::Deny, Some(span)) | (Level::Forbid, Some(span)) => {
@@ -256,7 +276,7 @@ pub fn struct_lint_level<'s, 'd>(
                     Level::Warn => "-W",
                     Level::Deny => "-D",
                     Level::Forbid => "-F",
-                    Level::Allow => panic!(),
+                    Level::Allow | Level::Expect => panic!(),
                 };
                 let hyphen_case_lint_name = name.replace("_", "-");
                 if lint_flag_val.as_str() == name {
