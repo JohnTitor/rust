@@ -224,7 +224,7 @@ pub fn struct_lint_level<'s, 'd>(
                         .emit();
                         return;
                     }
-                    sess.struct_span_err(MultiSpan::from_span(src), "expect must have reason")
+                    sess.struct_span_err(MultiSpan::from_span(src), "`expect` must have `reason` field")
                         .emit();
                     return;
                 } else {

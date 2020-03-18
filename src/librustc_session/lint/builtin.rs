@@ -496,6 +496,16 @@ declare_lint! {
     "detects incompatible use of `#[inline(always)]` and `#[no_sanitize(...)]`",
 }
 
+declare_lint! {
+    pub EXPECTATION_MISSING,
+    Warn,
+    "checks the `expect` attribute has `reason` field",
+    @future_incompatible = FutureIncompatibleInfo {
+        reference: "issue #54503 <https://github.com/rust-lang/rust/issues/54503>",
+        edition: None,
+    };
+}
+
 declare_lint_pass! {
     /// Does nothing as a lint pass, but registers some `Lint`s
     /// that are used by other parts of the compiler.
@@ -562,6 +572,7 @@ declare_lint_pass! {
         INDIRECT_STRUCTURAL_MATCH,
         SOFT_UNSTABLE,
         INLINE_NO_SANITIZE,
+        EXPECTATION_MISSING,
     ]
 }
 
