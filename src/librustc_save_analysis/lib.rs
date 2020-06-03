@@ -527,94 +527,104 @@ impl<'l, 'tcx> SaveContext<'l, 'tcx> {
 
     pub fn get_expr_data(&self, expr: &ast::Expr) -> Option<Data> {
         let expr_hir_id = self.tcx.hir().node_id_to_hir_id(expr.id);
-        let hir_node = self.tcx.hir().expect_expr(expr_hir_id);
-        let ty = self.tables.expr_ty_adjusted_opt(&hir_node);
-        if ty.is_none() || ty.unwrap().kind == ty::Error {
-            return None;
-        }
-        match expr.kind {
-            ast::ExprKind::Field(ref sub_ex, ident) => {
-                let sub_ex_hir_id = self.tcx.hir().node_id_to_hir_id(sub_ex.id);
-                let hir_node = match self.tcx.hir().find(sub_ex_hir_id) {
-                    Some(Node::Expr(expr)) => expr,
-                    _ => {
-                        debug!(
-                            "Missing or weird node for sub-expression {} in {:?}",
-                            sub_ex.id, expr
-                        );
-                        return None;
-                    }
-                };
-                match self.tables.expr_ty_adjusted(&hir_node).kind {
-                    ty::Adt(def, _) if !def.is_enum() => {
-                        let variant = &def.non_enum_variant();
-                        filter!(self.span_utils, ident.span);
-                        let span = self.span_from_span(ident.span);
-                        Some(Data::RefData(Ref {
-                            kind: RefKind::Variable,
-                            span,
-                            ref_id: self
-                                .tcx
-                                .find_field_index(ident, variant)
-                                .map(|index| id_from_def_id(variant.fields[index].did))
-                                .unwrap_or_else(null_id),
-                        }))
-                    }
-                    ty::Tuple(..) => None,
-                    _ => {
-                        debug!("expected struct or union type, found {:?}", ty);
-                        None
-                    }
+        match self.tcx.hir().find(expr_hir_id) {
+            Some(Node::Expr(hir_node)) => {
+                let ty = self.tables.expr_ty_adjusted_opt(&hir_node);
+                if ty.is_none() || ty.unwrap().kind == ty::Error {
+                    return None;
                 }
-            }
-            ast::ExprKind::Struct(ref path, ..) => {
-                match self.tables.expr_ty_adjusted(&hir_node).kind {
-                    ty::Adt(def, _) if !def.is_enum() => {
-                        let sub_span = path.segments.last().unwrap().ident.span;
+                match expr.kind {
+                    ast::ExprKind::Field(ref sub_ex, ident) => {
+                        let sub_ex_hir_id = self.tcx.hir().node_id_to_hir_id(sub_ex.id);
+                        let hir_node = match self.tcx.hir().find(sub_ex_hir_id) {
+                            Some(Node::Expr(expr)) => expr,
+                            _ => {
+                                debug!(
+                                    "Missing or weird node for sub-expression {} in {:?}",
+                                    sub_ex.id, expr
+                                );
+                                return None;
+                            }
+                        };
+                        match self.tables.expr_ty_adjusted(&hir_node).kind {
+                            ty::Adt(def, _) if !def.is_enum() => {
+                                let variant = &def.non_enum_variant();
+                                filter!(self.span_utils, ident.span);
+                                let span = self.span_from_span(ident.span);
+                                Some(Data::RefData(Ref {
+                                    kind: RefKind::Variable,
+                                    span,
+                                    ref_id: self
+                                        .tcx
+                                        .find_field_index(ident, variant)
+                                        .map(|index| id_from_def_id(variant.fields[index].did))
+                                        .unwrap_or_else(null_id),
+                                }))
+                            }
+                            ty::Tuple(..) => None,
+                            _ => {
+                                debug!("expected struct or union type, found {:?}", ty);
+                                None
+                            }
+                        }
+                    }
+                    ast::ExprKind::Struct(ref path, ..) => {
+                        match self.tables.expr_ty_adjusted(&hir_node).kind {
+                            ty::Adt(def, _) if !def.is_enum() => {
+                                let sub_span = path.segments.last().unwrap().ident.span;
+                                filter!(self.span_utils, sub_span);
+                                let span = self.span_from_span(sub_span);
+                                Some(Data::RefData(Ref {
+                                    kind: RefKind::Type,
+                                    span,
+                                    ref_id: id_from_def_id(def.did),
+                                }))
+                            }
+                            _ => {
+                                // FIXME ty could legitimately be an enum, but then we will fail
+                                // later if we try to look up the fields.
+                                debug!("expected struct or union, found {:?}", ty);
+                                None
+                            }
+                        }
+                    }
+                    ast::ExprKind::MethodCall(ref seg, ..) => {
+                        let expr_hir_id = self.tcx.hir().definitions().node_id_to_hir_id(expr.id);
+                        let method_id = match self.tables.type_dependent_def_id(expr_hir_id) {
+                            Some(id) => id,
+                            None => {
+                                debug!("could not resolve method id for {:?}", expr);
+                                return None;
+                            }
+                        };
+                        let (def_id, decl_id) = match self.tcx.associated_item(method_id).container {
+                            ty::ImplContainer(_) => (Some(method_id), None),
+                            ty::TraitContainer(_) => (None, Some(method_id)),
+                        };
+                        let sub_span = seg.ident.span;
                         filter!(self.span_utils, sub_span);
                         let span = self.span_from_span(sub_span);
                         Some(Data::RefData(Ref {
-                            kind: RefKind::Type,
+                            kind: RefKind::Function,
                             span,
-                            ref_id: id_from_def_id(def.did),
+                            ref_id: def_id.or(decl_id).map(id_from_def_id).unwrap_or_else(null_id),
                         }))
                     }
+                    ast::ExprKind::Path(_, ref path) => {
+                        self.get_path_data(expr.id, path).map(Data::RefData)
+                    }
                     _ => {
-                        // FIXME ty could legitimately be an enum, but then we will fail
-                        // later if we try to look up the fields.
-                        debug!("expected struct or union, found {:?}", ty);
-                        None
+                        // FIXME
+                        bug!();
                     }
                 }
             }
-            ast::ExprKind::MethodCall(ref seg, ..) => {
-                let expr_hir_id = self.tcx.hir().definitions().node_id_to_hir_id(expr.id);
-                let method_id = match self.tables.type_dependent_def_id(expr_hir_id) {
-                    Some(id) => id,
-                    None => {
-                        debug!("could not resolve method id for {:?}", expr);
-                        return None;
-                    }
-                };
-                let (def_id, decl_id) = match self.tcx.associated_item(method_id).container {
-                    ty::ImplContainer(_) => (Some(method_id), None),
-                    ty::TraitContainer(_) => (None, Some(method_id)),
-                };
-                let sub_span = seg.ident.span;
-                filter!(self.span_utils, sub_span);
-                let span = self.span_from_span(sub_span);
-                Some(Data::RefData(Ref {
-                    kind: RefKind::Function,
-                    span,
-                    ref_id: def_id.or(decl_id).map(id_from_def_id).unwrap_or_else(null_id),
-                }))
-            }
-            ast::ExprKind::Path(_, ref path) => {
-                self.get_path_data(expr.id, path).map(Data::RefData)
-            }
             _ => {
-                // FIXME
-                bug!();
+                debug!(
+                    "Missing or weird node for expression {} in {:?}",
+                    expr.id, expr
+                );
+                return None;
             }
         }
     }
