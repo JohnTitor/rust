@@ -1188,6 +1188,10 @@ pub struct Resolver<'ra, 'tcx> {
     // Used for suggestions during error reporting.
     pat_span_map: NodeMap<Span> = Default::default(),
 
+    /// Local `let` bindings whose initializer references the same name.
+    /// Used to detect inccorect diagnostics.
+    locals_referencing_own_name_in_init: FxHashSet<NodeId> = default::fx_hash_set(),
+
     /// Resolutions for nodes that have a single resolution.
     partial_res_map: NodeMap<PartialRes> = Default::default(),
     /// Resolutions for import nodes, which have multiple resolutions in different namespaces.

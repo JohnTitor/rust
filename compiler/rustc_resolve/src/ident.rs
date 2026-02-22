@@ -1413,7 +1413,7 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
         }
 
         match res {
-            Res::Local(_) => {
+            Res::Local(local_id) => {
                 use ResolutionError::*;
                 let mut res_err = None;
 
@@ -1447,27 +1447,39 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
                                         (span, LowercaseSelf)
                                     }
                                     None => {
+                                        let suggest_const = !self
+                                            .locals_referencing_own_name_in_init
+                                            .contains(&local_id);
+
                                         // If we have a `let name = expr;`, we have the span for
                                         // `name` and use that to see if it is followed by a type
                                         // specifier. If not, then we know we need to suggest
                                         // `const name: Ty = expr;`. This is a heuristic, it will
                                         // break down in the presence of macros.
-                                        let sm = self.tcx.sess.source_map();
-                                        let type_span = match sm.span_look_ahead(
-                                            original_rib_ident_def.span,
-                                            ":",
-                                            None,
-                                        ) {
-                                            None => {
-                                                Some(original_rib_ident_def.span.shrink_to_hi())
+                                        let type_span = if suggest_const {
+                                            let sm = self.tcx.sess.source_map();
+                                            match sm.span_look_ahead(
+                                                original_rib_ident_def.span,
+                                                ":",
+                                                None,
+                                            ) {
+                                                None => {
+                                                    Some(original_rib_ident_def.span.shrink_to_hi())
+                                                }
+                                                Some(_) => None,
                                             }
-                                            Some(_) => None,
+                                        } else {
+                                            None
                                         };
                                         (
                                             rib_ident.span,
                                             AttemptToUseNonConstantValueInConstant {
                                                 ident: original_rib_ident_def,
-                                                suggestion: "const",
+                                                suggestion: if suggest_const {
+                                                    "const"
+                                                } else {
+                                                    ""
+                                                },
                                                 current: "let",
                                                 type_span,
                                             },

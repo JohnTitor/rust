@@ -1,3 +1,6 @@
+// FIXME(@JohnTitor): split this file into smaller modules.
+// ignore-tidy-filelength
+
 use std::ops::ControlFlow;
 
 use itertools::Itertools as _;
@@ -926,40 +929,47 @@ impl<'ra, 'tcx> Resolver<'ra, 'tcx> {
                 //     ^^^ given this Span
                 // ------- get this Span to have an applicable suggestion
 
-                // edit:
-                // only do this if the const and usage of the non-constant value are on the same line
-                // the further the two are apart, the higher the chance of the suggestion being wrong
+                let ((with, with_label), without) = if suggestion.is_empty() {
+                    ((None, None), None)
+                } else {
+                    // edit:
+                    // only do this if the const and usage of the non-constant value are on the same line
+                    // the further the two are apart, the higher the chance of the suggestion being wrong
+                    let sp = self
+                        .tcx
+                        .sess
+                        .source_map()
+                        .span_extend_to_prev_str(ident.span, current, true, false);
 
-                let sp = self
-                    .tcx
-                    .sess
-                    .source_map()
-                    .span_extend_to_prev_str(ident.span, current, true, false);
-
-                let ((with, with_label), without) = match sp {
-                    Some(sp) if !self.tcx.sess.source_map().is_multiline(sp) => {
-                        let sp = sp
-                            .with_lo(BytePos(sp.lo().0 - (current.len() as u32)))
-                            .until(ident.span);
-                        (
-                        (Some(errs::AttemptToUseNonConstantValueInConstantWithSuggestion {
-                                span: sp,
+                    match sp {
+                        Some(sp) if !self.tcx.sess.source_map().is_multiline(sp) => {
+                            let sp = sp
+                                .with_lo(BytePos(sp.lo().0 - (current.len() as u32)))
+                                .until(ident.span);
+                            (
+                                (
+                                    Some(errs::AttemptToUseNonConstantValueInConstantWithSuggestion {
+                                        span: sp,
+                                        suggestion,
+                                        current,
+                                        type_span,
+                                    }),
+                                    Some(
+                                        errs::AttemptToUseNonConstantValueInConstantLabelWithSuggestion { span },
+                                    ),
+                                ),
+                                None,
+                            )
+                        }
+                        _ => (
+                            (None, None),
+                            Some(errs::AttemptToUseNonConstantValueInConstantWithoutSuggestion {
+                                ident_span: ident.span,
                                 suggestion,
-                                current,
-                                type_span,
-                            }), Some(errs::AttemptToUseNonConstantValueInConstantLabelWithSuggestion {span})),
-                            None,
-                        )
+                            }),
+                        ),
                     }
-                    _ => (
-                        (None, None),
-                        Some(errs::AttemptToUseNonConstantValueInConstantWithoutSuggestion {
-                            ident_span: ident.span,
-                            suggestion,
-                        }),
-                    ),
                 };
-
                 self.dcx().create_err(errs::AttemptToUseNonConstantValueInConstant {
                     span,
                     with,

@@ -3857,6 +3857,42 @@ impl<'a, 'ast, 'ra, 'tcx> LateResolutionVisitor<'a, 'ast, 'ra, 'tcx> {
         // Resolve the type.
         visit_opt!(self, visit_ty, &local.ty);
 
+        if let Some((init, _)) = local.kind.init_else_opt() {
+            let mut local_bindings = Vec::new();
+            local.pat.walk(&mut |pat| {
+                if let PatKind::Ident(_, ident, _) = pat.kind {
+                    local_bindings.push((ident.name, pat.id));
+                }
+                true
+            });
+            if !local_bindings.is_empty() {
+                struct InitNameCollector {
+                    names: FxHashSet<Symbol>,
+                }
+
+                impl<'ast> Visitor<'ast> for InitNameCollector {
+                    fn visit_expr(&mut self, expr: &'ast Expr) {
+                        if let ExprKind::Path(None, path) = &expr.kind
+                            && path.segments.len() == 1
+                        {
+                            self.names.insert(path.segments[0].ident.name);
+                        }
+                        visit::walk_expr(self, expr);
+                    }
+
+                    fn visit_attribute(&mut self, _: &'ast Attribute) {}
+                }
+
+                let mut names_in_init = InitNameCollector { names: FxHashSet::default() };
+                names_in_init.visit_expr(init);
+                for (name, id) in local_bindings {
+                    if names_in_init.names.contains(&name) {
+                        self.r.locals_referencing_own_name_in_init.insert(id);
+                    }
+                }
+            }
+        }
+
         // Resolve the initializer.
         if let Some((init, els)) = local.kind.init_else_opt() {
             self.visit_expr(init);
